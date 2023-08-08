@@ -18,10 +18,11 @@ from streamlit_chat import message
 st.set_page_config(layout="wide")
 
 checkpoint = "LaMini-T5-738M"
-tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_auth_token = True)
 base_model = AutoModelForSeq2SeqLM.from_pretrained(
     checkpoint,
     device_map="auto",
+    offload_folder="offload", 
     torch_dtype = torch.float32
 )
 
@@ -35,12 +36,12 @@ def data_ingestion():
                 print(file)
                 loader = PDFMinerLoader(os.path.join(root, file))
     documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=500)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     texts = text_splitter.split_documents(documents)
     #create embeddings here
     embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
     #create vector store here
-    db = Chroma.from_documents(texts, embeddings, persist_directory=persist_directory, client_settings=CHROMA_SETTINGS)
+    db = Chroma.from_documents(texts, embeddings, persist_directory=persist_directory)
     db.persist()
     db=None 
 
@@ -62,7 +63,7 @@ def llm_pipeline():
 def qa_llm():
     llm = llm_pipeline()
     embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-    db = Chroma(persist_directory="db", embedding_function = embeddings, client_settings=CHROMA_SETTINGS)
+    db = Chroma(persist_directory="db", embedding_function = embeddings)
     retriever = db.as_retriever()
     qa = RetrievalQA.from_chain_type(
         llm = llm,
@@ -106,10 +107,8 @@ def display_conversation(history):
         message(history["generated"][i],key=str(i))
 
 def main():
-    st.markdown("<h1 style='text-align: center; color: blue;'>Chat with your PDF 🦜📄 </h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: grey;'>Built by <a href='https://github.com/AIAnytime'>AI Anytime with ❤️ </a></h3>", unsafe_allow_html=True)
-
-    st.markdown("<h2 style='text-align: center; color:red;'>Upload your PDF 👇</h2>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>Chat with your PDF</h1>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>Upload your PDF</h2>", unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader("", type=["pdf"])
 
